@@ -8,14 +8,17 @@ import {
   Activity, 
   Settings, 
   ChevronLeft, 
-  ChevronRight 
+  ChevronRight,
+  Shield 
 } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useAuth } from '@/contexts/AuthContext';
 
 const Sidebar = () => {
   const [collapsed, setCollapsed] = useState(false);
   const isMobile = useIsMobile();
   const location = useLocation();
+  const { isAdmin } = useAuth();
 
   const links = [
     { name: 'Dashboard', to: '/dashboard', icon: <Gauge size={20} /> },
@@ -24,6 +27,11 @@ const Sidebar = () => {
     { name: 'Profile', to: '/profile', icon: <User size={20} /> },
     { name: 'Settings', to: '/settings', icon: <Settings size={20} /> },
   ];
+
+  // Add admin link for admin users only
+  if (isAdmin()) {
+    links.push({ name: 'Admin', to: '/admin', icon: <Shield size={20} /> });
+  }
 
   if (isMobile) {
     return (

@@ -85,6 +85,9 @@ const Signup = () => {
                       <Input placeholder="name@example.com" type="email" {...field} />
                     </FormControl>
                     <FormMessage />
+                    <p className="text-xs text-muted-foreground">
+                      Use admin@carewise.com to create an admin account
+                    </p>
                   </FormItem>
                 )}
               />

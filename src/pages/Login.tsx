@@ -95,6 +95,10 @@ const Login = () => {
               </Button>
             </form>
           </Form>
+          
+          <div className="mt-4 text-xs text-center text-muted-foreground">
+            <p>For admin access, use: admin@carewise.com / password123</p>
+          </div>
         </CardContent>
         <CardFooter className="flex justify-center">
           <p className="text-sm text-muted-foreground">

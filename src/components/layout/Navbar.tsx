@@ -1,6 +1,6 @@
 
 import { Link } from 'react-router-dom';
-import { Moon, Sun, Menu, X, User } from 'lucide-react';
+import { Moon, Sun, Menu, X, User, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -14,7 +14,7 @@ import {
 
 const Navbar = () => {
   const { theme, toggleTheme } = useTheme();
-  const { user, logout } = useAuth();
+  const { user, logout, isAdmin } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
@@ -40,6 +40,11 @@ const Navbar = () => {
                 <Link to="/analysis" className="text-foreground/80 hover:text-foreground transition">
                   Health Analysis
                 </Link>
+                {isAdmin() && (
+                  <Link to="/admin" className="text-foreground/80 hover:text-foreground transition flex items-center">
+                    <Shield size={16} className="mr-1" /> Admin
+                  </Link>
+                )}
               </>
             ) : (
               <>
@@ -66,11 +71,18 @@ const Navbar = () => {
             {user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="rounded-full bg-carewise-blue text-white">
-                    <User size={18} />
+                  <Button variant="ghost" size="icon" className={`rounded-full ${isAdmin() ? 'bg-carewise-green' : 'bg-carewise-blue'} text-white`}>
+                    {isAdmin() ? <Shield size={18} /> : <User size={18} />}
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
+                  {isAdmin() && (
+                    <DropdownMenuItem>
+                      <Link to="/admin" className="w-full flex items-center">
+                        <Shield size={16} className="mr-2" /> Admin Dashboard
+                      </Link>
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuItem>
                     <Link to="/settings" className="w-full">Settings</Link>
                   </DropdownMenuItem>
@@ -127,6 +139,15 @@ const Navbar = () => {
                 >
                   Health Analysis
                 </Link>
+                {isAdmin() && (
+                  <Link 
+                    to="/admin" 
+                    className="block py-2 text-foreground/80 hover:text-foreground flex items-center"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    <Shield size={16} className="mr-1" /> Admin Dashboard
+                  </Link>
+                )}
               </>
             ) : (
               <>

@@ -7,6 +7,7 @@ interface User {
   id: string;
   email: string;
   name: string;
+  role: 'user' | 'admin';
 }
 
 interface StoredUser extends User {
@@ -20,6 +21,7 @@ interface AuthContextType {
   signup: (name: string, email: string, password: string) => Promise<void>;
   logout: () => void;
   updateProfile: (userData: Partial<User>) => void;
+  isAdmin: () => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -52,7 +54,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setUser({
         id: parsedUser.id,
         email: parsedUser.email,
-        name: parsedUser.name
+        name: parsedUser.name,
+        role: parsedUser.role || 'user' // Default to 'user' for existing users
       });
     }
     setLoading(false);
@@ -80,7 +83,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       const publicUser = {
         id: userFound.id,
         email: userFound.email,
-        name: userFound.name
+        name: userFound.name,
+        role: userFound.role || 'user'
       };
       
       // Store the current logged in user
@@ -114,12 +118,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         throw new Error('An account with this email already exists');
       }
       
+      // Create admin account if it's the first user or use special admin email
+      const isAdmin = users.length === 0 || email === 'admin@carewise.com';
+      
       // Create new user
       const newUser: StoredUser = {
         id: 'user-' + Math.random().toString(36).substring(2, 9),
         email,
         name,
-        passwordHash: hashPassword(password)
+        passwordHash: hashPassword(password),
+        role: isAdmin ? 'admin' : 'user'
       };
       
       // Add to users array
@@ -130,7 +138,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       const publicUser = {
         id: newUser.id,
         email: newUser.email,
-        name: newUser.name
+        name: newUser.name,
+        role: newUser.role
       };
       
       // Set as current user
@@ -139,7 +148,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       
       toast({
         title: "Account created",
-        description: "Welcome to CareWise!"
+        description: isAdmin 
+          ? "Welcome to CareWise! You have been granted admin privileges."
+          : "Welcome to CareWise!"
       });
       
       navigate('/dashboard');
@@ -190,7 +201,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       const updatedPublicUser = {
         id: updatedUser.id,
         email: updatedUser.email,
-        name: updatedUser.name
+        name: updatedUser.name,
+        role: updatedUser.role
       };
       setUser(updatedPublicUser);
       
@@ -201,8 +213,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
+  const isAdmin = () => {
+    return user?.role === 'admin';
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, signup, logout, updateProfile }}>
+    <AuthContext.Provider value={{ user, loading, login, signup, logout, updateProfile, isAdmin }}>
       {children}
     </AuthContext.Provider>
   );
