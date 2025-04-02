@@ -35,7 +35,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 // Maximum number of admins allowed
-const MAX_ADMIN_COUNT = 2;
+const MAX_ADMIN_COUNT = 5; // Increased from 2 to 5
 
 // Simple hash function for demo purposes (NOT for production use)
 const hashPassword = (password: string): string => {
