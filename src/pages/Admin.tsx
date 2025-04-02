@@ -40,7 +40,8 @@ import {
   AlertTriangle, 
   Clock,
   Activity,
-  AlertCircle
+  AlertCircle,
+  Users
 } from 'lucide-react';
 import { toast } from '@/components/ui/use-toast';
 import {
@@ -59,6 +60,7 @@ interface UserData {
     timestamp: string;
     action: string;
   }[];
+  isOnline?: boolean;
 }
 
 interface ActivityLogItem {
@@ -69,7 +71,7 @@ interface ActivityLogItem {
 }
 
 const Admin = () => {
-  const { user, isAdmin, getAllUsers, getMaxAdminCount } = useAuth();
+  const { user, isAdmin, getAllUsers, getMaxAdminCount, getActiveUserCount, getMaxActiveUsers } = useAuth();
   const navigate = useNavigate();
   const [users, setUsers] = useState<UserData[]>([]);
   const [selectedUser, setSelectedUser] = useState<UserData | null>(null);
@@ -78,6 +80,8 @@ const Admin = () => {
   const [activityLogs, setActivityLogs] = useState<ActivityLogItem[]>([]);
   const [activeAdminCount, setActiveAdminCount] = useState(0);
   const [maxAdminCount, setMaxAdminCount] = useState(2);
+  const [activeUserCount, setActiveUserCount] = useState(0);
+  const [maxActiveUsers, setMaxActiveUsers] = useState(20);
 
   // Format date for display
   const formatDate = (dateString?: string) => {
@@ -102,6 +106,7 @@ const Admin = () => {
       case 'form_submitted': return 'Submitted health form';
       case 'viewed_analysis': return 'Viewed health analysis';
       case 'app_accessed': return 'Accessed the app';
+      case 'still_active': return 'Active in app';
       default: return action.replace(/_/g, ' ');
     }
   };
@@ -118,6 +123,14 @@ const Admin = () => {
     } else {
       loadUsers();
       setMaxAdminCount(getMaxAdminCount());
+      setMaxActiveUsers(getMaxActiveUsers());
+      
+      // Set up interval to refresh user data every 30 seconds
+      const interval = setInterval(() => {
+        loadUsers();
+      }, 30000);
+      
+      return () => clearInterval(interval);
     }
   }, [isAdmin, navigate]);
 
@@ -128,6 +141,10 @@ const Admin = () => {
     // Calculate the number of admins
     const adminCount = storedUsers.filter((u: UserData) => u.role === 'admin').length;
     setActiveAdminCount(adminCount);
+    
+    // Calculate active users
+    const onlineUsers = storedUsers.filter((u: UserData) => u.isOnline);
+    setActiveUserCount(onlineUsers.length);
     
     setUsers(storedUsers);
     setTotalUsers(storedUsers.length);
@@ -246,7 +263,7 @@ const Admin = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-xl">Total Users</CardTitle>
@@ -275,6 +292,19 @@ const Admin = () => {
         
         <Card>
           <CardHeader className="pb-2">
+            <CardTitle className="text-xl">Active Users</CardTitle>
+            <CardDescription>Limited to {maxActiveUsers} concurrent</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center">
+              <Users className="mr-2" size={24} />
+              <span className="text-2xl font-bold">{activeUserCount}/{maxActiveUsers}</span>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader className="pb-2">
             <CardTitle className="text-xl">Recent Activity</CardTitle>
             <CardDescription>Last 24 hours</CardDescription>
           </CardHeader>
@@ -295,6 +325,7 @@ const Admin = () => {
         <TabsList className="mb-4">
           <TabsTrigger value="users">User Management</TabsTrigger>
           <TabsTrigger value="activity">User Activity</TabsTrigger>
+          <TabsTrigger value="online">Online Users</TabsTrigger>
         </TabsList>
         
         <TabsContent value="users">
@@ -312,6 +343,7 @@ const Admin = () => {
                     <TableHead>Name</TableHead>
                     <TableHead>Email</TableHead>
                     <TableHead>Role</TableHead>
+                    <TableHead>Status</TableHead>
                     <TableHead>Last Active</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
@@ -326,6 +358,13 @@ const Admin = () => {
                           user.role === 'admin' ? 'bg-carewise-green text-white' : 'bg-gray-200 dark:bg-gray-700'
                         }`}>
                           {user.role}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                          user.isOnline ? 'bg-green-500 text-white' : 'bg-gray-300 dark:bg-gray-600'
+                        }`}>
+                          {user.isOnline ? 'Online' : 'Offline'}
                         </span>
                       </TableCell>
                       <TableCell>
@@ -416,6 +455,58 @@ const Admin = () => {
                 </p>
               </CardFooter>
             )}
+          </Card>
+        </TabsContent>
+        
+        <TabsContent value="online">
+          <Card>
+            <CardHeader>
+              <CardTitle>Online Users</CardTitle>
+              <CardDescription>Currently active users ({activeUserCount} of {maxActiveUsers} max)</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Role</TableHead>
+                    <TableHead>Last Activity</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {users.filter(u => u.isOnline).map((user) => (
+                    <TableRow key={user.id}>
+                      <TableCell>{user.name}</TableCell>
+                      <TableCell>{user.email}</TableCell>
+                      <TableCell>
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                          user.role === 'admin' ? 'bg-carewise-green text-white' : 'bg-gray-200 dark:bg-gray-700'
+                        }`}>
+                          {user.role}
+                        </span>
+                      </TableCell>
+                      <TableCell>{formatDate(user.lastActive)}</TableCell>
+                    </TableRow>
+                  ))}
+                  {users.filter(u => u.isOnline).length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={4} className="text-center py-4">
+                        No users currently online
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+            <CardFooter>
+              {activeUserCount >= maxActiveUsers && (
+                <div className="flex items-center text-amber-500">
+                  <AlertCircle className="h-4 w-4 mr-2" />
+                  Maximum concurrent user limit reached ({maxActiveUsers})
+                </div>
+              )}
+            </CardFooter>
           </Card>
         </TabsContent>
       </Tabs>

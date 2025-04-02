@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from '@/components/ui/use-toast';
@@ -17,6 +16,7 @@ interface StoredUser extends User {
     timestamp: string;
     action: string;
   }[];
+  isOnline?: boolean;
 }
 
 interface AuthContextType {
@@ -30,12 +30,17 @@ interface AuthContextType {
   logActivity: (action: string) => void;
   getAllUsers: () => StoredUser[];
   getMaxAdminCount: () => number;
+  getActiveUserCount: () => number;
+  getMaxActiveUsers: () => number;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 // Maximum number of admins allowed
 const MAX_ADMIN_COUNT = 5; // Increased from 2 to 5
+
+// Maximum number of concurrent users allowed
+const MAX_ACTIVE_USERS = 20;
 
 // Simple hash function for demo purposes (NOT for production use)
 const hashPassword = (password: string): string => {
@@ -56,6 +61,42 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
+  // Check active users and clean up inactive ones
+  const cleanupInactiveUsers = () => {
+    const storedUsers = localStorage.getItem('carewise_users');
+    if (!storedUsers) return;
+    
+    const users: StoredUser[] = JSON.parse(storedUsers);
+    const now = new Date().getTime();
+    const FIFTEEN_MINUTES = 15 * 60 * 1000; // 15 minutes in milliseconds
+    
+    const updatedUsers = users.map(u => {
+      // If the user was last active more than 15 minutes ago, mark them as offline
+      if (u.isOnline && u.lastActive) {
+        const lastActiveTime = new Date(u.lastActive).getTime();
+        if (now - lastActiveTime > FIFTEEN_MINUTES) {
+          return { ...u, isOnline: false };
+        }
+      }
+      return u;
+    });
+    
+    localStorage.setItem('carewise_users', JSON.stringify(updatedUsers));
+  };
+  
+  // Get number of currently active users
+  const getActiveUserCount = () => {
+    cleanupInactiveUsers();
+    const storedUsers = localStorage.getItem('carewise_users');
+    if (!storedUsers) return 0;
+    
+    const users: StoredUser[] = JSON.parse(storedUsers);
+    return users.filter(u => u.isOnline).length;
+  };
+  
+  // Get max allowed active users
+  const getMaxActiveUsers = () => MAX_ACTIVE_USERS;
+
   useEffect(() => {
     // Check if user is logged in
     const storedUser = localStorage.getItem('carewise_user');
@@ -69,12 +110,38 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         role: parsedUser.role || 'user'
       });
       
-      // Log user activity on initial load
+      // Set user as online and log activity
       if (parsedUser.id) {
+        // Mark user as online in the users array
+        const storedUsers = localStorage.getItem('carewise_users');
+        if (storedUsers) {
+          const users: StoredUser[] = JSON.parse(storedUsers);
+          const updatedUsers = users.map(u => {
+            if (u.id === parsedUser.id) {
+              return { ...u, isOnline: true, lastActive: new Date().toISOString() };
+            }
+            return u;
+          });
+          
+          localStorage.setItem('carewise_users', JSON.stringify(updatedUsers));
+        }
+        
         logActivity('app_accessed');
       }
     }
     setLoading(false);
+    
+    // Set up an interval to periodically update user activity
+    const activityInterval = setInterval(() => {
+      if (user) {
+        logActivity('still_active');
+      }
+    }, 60000); // Update every minute
+    
+    // Clean up on unmount
+    return () => {
+      clearInterval(activityInterval);
+    };
   }, []);
 
   const getAllUsers = () => {
@@ -134,6 +201,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const login = async (email: string, password: string) => {
     try {
+      // Check if max active users limit is reached
+      const activeUserCount = getActiveUserCount();
+      if (activeUserCount >= MAX_ACTIVE_USERS) {
+        throw new Error(`Maximum number of concurrent users (${MAX_ACTIVE_USERS}) has been reached. Please try again later.`);
+      }
+      
       // Get stored users
       const storedUsers = localStorage.getItem('carewise_users');
       const users: StoredUser[] = storedUsers ? JSON.parse(storedUsers) : [];
@@ -157,6 +230,24 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         name: userFound.name,
         role: userFound.role || 'user'
       };
+      
+      // Update the user's online status
+      const updatedUsers = users.map(u => {
+        if (u.id === userFound.id) {
+          return { 
+            ...u, 
+            isOnline: true,
+            lastActive: new Date().toISOString() 
+          };
+        }
+        return u;
+      });
+      
+      localStorage.setItem('carewise_users', JSON.stringify(updatedUsers));
+      
+      // Update the userFound object to include isOnline
+      userFound.isOnline = true;
+      userFound.lastActive = new Date().toISOString();
       
       // Store the current logged in user
       localStorage.setItem('carewise_user', JSON.stringify(userFound));
@@ -183,6 +274,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const signup = async (name: string, email: string, password: string) => {
     try {
+      // Check if max active users limit is reached
+      const activeUserCount = getActiveUserCount();
+      if (activeUserCount >= MAX_ACTIVE_USERS && email !== 'admin') {
+        throw new Error(`Maximum number of concurrent users (${MAX_ACTIVE_USERS}) has been reached. Please try again later.`);
+      }
+      
       // Get stored users or initialize an empty array
       const storedUsers = localStorage.getItem('carewise_users');
       const users: StoredUser[] = storedUsers ? JSON.parse(storedUsers) : [];
@@ -207,13 +304,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       // If we're at max admins and this isn't a special case, make it a regular user
       const role = (currentAdminCount >= MAX_ADMIN_COUNT && !isForceAdmin && users.length > 0) ? 'user' : (isAdmin ? 'admin' : 'user');
       
-      // Create new user with activity tracking
+      // Create new user with activity tracking and online status
       const newUser: StoredUser = {
         id: 'user-' + Math.random().toString(36).substring(2, 9),
         email,
         name,
         passwordHash: hashPassword(password),
         role,
+        isOnline: true,
         lastActive: new Date().toISOString(),
         activityLog: [{
           timestamp: new Date().toISOString(),
@@ -259,9 +357,24 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const logout = () => {
-    // Log the activity before logging out
+    // Mark the user as offline before logging out
     if (user) {
+      // Log the activity before logging out
       logActivity('logged_out');
+      
+      // Update the user's online status
+      const storedUsers = localStorage.getItem('carewise_users');
+      if (storedUsers) {
+        const users: StoredUser[] = JSON.parse(storedUsers);
+        const updatedUsers = users.map(u => {
+          if (u.id === user.id) {
+            return { ...u, isOnline: false };
+          }
+          return u;
+        });
+        
+        localStorage.setItem('carewise_users', JSON.stringify(updatedUsers));
+      }
     }
     
     localStorage.removeItem('carewise_user');
@@ -330,7 +443,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       isAdmin,
       logActivity, 
       getAllUsers,
-      getMaxAdminCount
+      getMaxAdminCount,
+      getActiveUserCount,
+      getMaxActiveUsers
     }}>
       {children}
     </AuthContext.Provider>
