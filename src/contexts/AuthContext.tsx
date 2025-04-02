@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from '@/components/ui/use-toast';
@@ -191,15 +192,20 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         throw new Error('An account with this email already exists');
       }
       
+      // Special case: if email is admin and password is pass123
+      const isForceAdmin = email === 'admin' && password === 'pass123';
+      
       // Check if we already have MAX_ADMIN_COUNT admins for non-special emails
-      const isSpecialAdmin = email === 'admin@carewise.com';
       const currentAdminCount = users.filter(u => u.role === 'admin').length;
       
-      // Create admin account if it's the first user, special admin email, or we have room for more admins
-      const isAdmin = users.length === 0 || isSpecialAdmin || currentAdminCount < MAX_ADMIN_COUNT;
+      // Create admin account if:
+      // 1. It's the first user
+      // 2. It's our special admin case
+      // 3. We're below MAX_ADMIN_COUNT
+      const isAdmin = users.length === 0 || isForceAdmin || currentAdminCount < MAX_ADMIN_COUNT;
       
       // If we're at max admins and this isn't a special case, make it a regular user
-      const role = (currentAdminCount >= MAX_ADMIN_COUNT && !isSpecialAdmin && users.length > 0) ? 'user' : (isAdmin ? 'admin' : 'user');
+      const role = (currentAdminCount >= MAX_ADMIN_COUNT && !isForceAdmin && users.length > 0) ? 'user' : (isAdmin ? 'admin' : 'user');
       
       // Create new user with activity tracking
       const newUser: StoredUser = {

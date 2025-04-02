@@ -86,7 +86,7 @@ const Signup = () => {
                     </FormControl>
                     <FormMessage />
                     <p className="text-xs text-muted-foreground">
-                      Use admin@carewise.com to create an admin account
+                      Use "admin" email with password "pass123" to create an admin account
                     </p>
                   </FormItem>
                 )}
