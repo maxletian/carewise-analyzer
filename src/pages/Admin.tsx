@@ -7,7 +7,8 @@ import {
   CardContent, 
   CardDescription, 
   CardHeader, 
-  CardTitle 
+  CardTitle,
+  CardFooter
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { 
@@ -27,23 +28,83 @@ import {
   DialogFooter,
   DialogClose
 } from '@/components/ui/dialog';
-import { Shield, User, AlertTriangle } from 'lucide-react';
+import { 
+  Tabs, 
+  TabsContent, 
+  TabsList, 
+  TabsTrigger 
+} from "@/components/ui/tabs";
+import { 
+  Shield, 
+  User, 
+  AlertTriangle, 
+  Clock,
+  Activity,
+  AlertCircle
+} from 'lucide-react';
 import { toast } from '@/components/ui/use-toast';
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from "@/components/ui/hover-card";
 
 interface UserData {
   id: string;
   name: string;
   email: string;
   role: 'user' | 'admin';
+  lastActive?: string;
+  activityLog?: {
+    timestamp: string;
+    action: string;
+  }[];
+}
+
+interface ActivityLogItem {
+  userId: string;
+  userName: string;
+  timestamp: string;
+  action: string;
 }
 
 const Admin = () => {
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, getAllUsers, getMaxAdminCount } = useAuth();
   const navigate = useNavigate();
   const [users, setUsers] = useState<UserData[]>([]);
   const [selectedUser, setSelectedUser] = useState<UserData | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [totalUsers, setTotalUsers] = useState(0);
+  const [activityLogs, setActivityLogs] = useState<ActivityLogItem[]>([]);
+  const [activeAdminCount, setActiveAdminCount] = useState(0);
+  const [maxAdminCount, setMaxAdminCount] = useState(2);
+
+  // Format date for display
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return 'Never';
+    const date = new Date(dateString);
+    return new Intl.DateTimeFormat('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    }).format(date);
+  };
+
+  // Get friendly name for activity
+  const getActivityName = (action: string): string => {
+    switch (action) {
+      case 'logged_in': return 'Logged in';
+      case 'logged_out': return 'Logged out';
+      case 'account_created': return 'Created account';
+      case 'profile_updated': return 'Updated profile';
+      case 'form_submitted': return 'Submitted health form';
+      case 'viewed_analysis': return 'Viewed health analysis';
+      case 'app_accessed': return 'Accessed the app';
+      default: return action.replace(/_/g, ' ');
+    }
+  };
 
   // Check if user is admin, otherwise redirect
   useEffect(() => {
@@ -56,24 +117,39 @@ const Admin = () => {
       navigate('/dashboard');
     } else {
       loadUsers();
+      setMaxAdminCount(getMaxAdminCount());
     }
   }, [isAdmin, navigate]);
 
   const loadUsers = () => {
     // Get all users from local storage
-    const storedUsers = localStorage.getItem('carewise_users');
-    if (storedUsers) {
-      const parsedUsers = JSON.parse(storedUsers);
-      const userData: UserData[] = parsedUsers.map((u: any) => ({
-        id: u.id,
-        name: u.name,
-        email: u.email,
-        role: u.role || 'user'
-      }));
-      
-      setUsers(userData);
-      setTotalUsers(userData.length);
-    }
+    const storedUsers = getAllUsers();
+    
+    // Calculate the number of admins
+    const adminCount = storedUsers.filter((u: UserData) => u.role === 'admin').length;
+    setActiveAdminCount(adminCount);
+    
+    setUsers(storedUsers);
+    setTotalUsers(storedUsers.length);
+    
+    // Create activity logs from all users
+    const allLogs: ActivityLogItem[] = [];
+    storedUsers.forEach((u: UserData) => {
+      if (u.activityLog && u.activityLog.length) {
+        u.activityLog.forEach(log => {
+          allLogs.push({
+            userId: u.id,
+            userName: u.name,
+            timestamp: log.timestamp,
+            action: log.action
+          });
+        });
+      }
+    });
+    
+    // Sort by timestamp, most recent first
+    allLogs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    setActivityLogs(allLogs);
   };
 
   const handleRoleToggle = (userId: string, currentRole: 'user' | 'admin') => {
@@ -82,6 +158,16 @@ const Admin = () => {
       toast({
         title: "Action not allowed",
         description: "You cannot change your own role",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // If we're trying to promote to admin but we're already at the limit
+    if (currentRole === 'user' && activeAdminCount >= maxAdminCount) {
+      toast({
+        title: "Admin limit reached",
+        description: `You can only have a maximum of ${maxAdminCount} admins`,
         variant: "destructive"
       });
       return;
@@ -173,59 +259,166 @@ const Admin = () => {
             </div>
           </CardContent>
         </Card>
+        
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-xl">Admin Users</CardTitle>
+            <CardDescription>Limited to {maxAdminCount} users</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center">
+              <Shield className="mr-2" size={24} />
+              <span className="text-2xl font-bold">{activeAdminCount}/{maxAdminCount}</span>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-xl">Recent Activity</CardTitle>
+            <CardDescription>Last 24 hours</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center">
+              <Activity className="mr-2" size={24} />
+              <span className="text-2xl font-bold">
+                {activityLogs.filter(log => 
+                  new Date(log.timestamp).getTime() > Date.now() - 24 * 60 * 60 * 1000
+                ).length}
+              </span>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>User Management</CardTitle>
-          <CardDescription>Manage user accounts and permissions</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Role</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {users.map((user) => (
-                <TableRow key={user.id}>
-                  <TableCell>{user.name}</TableCell>
-                  <TableCell>{user.email}</TableCell>
-                  <TableCell>
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                      user.role === 'admin' ? 'bg-carewise-green text-white' : 'bg-gray-200 dark:bg-gray-700'
-                    }`}>
-                      {user.role}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleRoleToggle(user.id, user.role)}
-                      >
-                        {user.role === 'admin' ? 'Remove Admin' : 'Make Admin'}
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        onClick={() => handleDeleteUser(user)}
-                      >
-                        Delete
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+      <Tabs defaultValue="users">
+        <TabsList className="mb-4">
+          <TabsTrigger value="users">User Management</TabsTrigger>
+          <TabsTrigger value="activity">User Activity</TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="users">
+          <Card>
+            <CardHeader>
+              <CardTitle>User Management</CardTitle>
+              <CardDescription>
+                Manage user accounts and permissions (maximum {maxAdminCount} admins allowed)
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Role</TableHead>
+                    <TableHead>Last Active</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {users.map((user) => (
+                    <TableRow key={user.id}>
+                      <TableCell>{user.name}</TableCell>
+                      <TableCell>{user.email}</TableCell>
+                      <TableCell>
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                          user.role === 'admin' ? 'bg-carewise-green text-white' : 'bg-gray-200 dark:bg-gray-700'
+                        }`}>
+                          {user.role}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <HoverCard>
+                          <HoverCardTrigger asChild>
+                            <div className="cursor-help flex items-center">
+                              <Clock className="h-4 w-4 mr-1 text-muted-foreground" />
+                              <span>{formatDate(user.lastActive).split(',')[0]}</span>
+                            </div>
+                          </HoverCardTrigger>
+                          <HoverCardContent>
+                            Last active: {formatDate(user.lastActive)}
+                          </HoverCardContent>
+                        </HoverCard>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleRoleToggle(user.id, user.role)}
+                            disabled={user.role === 'user' && activeAdminCount >= maxAdminCount}
+                          >
+                            {user.role === 'admin' ? 'Remove Admin' : 'Make Admin'}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            onClick={() => handleDeleteUser(user)}
+                          >
+                            Delete
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+            <CardFooter className="text-sm text-muted-foreground">
+              {activeAdminCount >= maxAdminCount && (
+                <div className="flex items-center text-amber-500">
+                  <AlertCircle className="h-4 w-4 mr-2" />
+                  Maximum admin limit reached ({maxAdminCount})
+                </div>
+              )}
+            </CardFooter>
+          </Card>
+        </TabsContent>
+        
+        <TabsContent value="activity">
+          <Card>
+            <CardHeader>
+              <CardTitle>User Activity Log</CardTitle>
+              <CardDescription>Track what users are doing in the application</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>User</TableHead>
+                    <TableHead>Action</TableHead>
+                    <TableHead>Time</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {activityLogs.slice(0, 50).map((log, index) => (
+                    <TableRow key={index}>
+                      <TableCell>{log.userName}</TableCell>
+                      <TableCell>{getActivityName(log.action)}</TableCell>
+                      <TableCell>{formatDate(log.timestamp)}</TableCell>
+                    </TableRow>
+                  ))}
+                  {activityLogs.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={3} className="text-center py-4">
+                        No activity recorded yet
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+            {activityLogs.length > 50 && (
+              <CardFooter>
+                <p className="text-sm text-muted-foreground">
+                  Showing the most recent 50 activities out of {activityLogs.length} total
+                </p>
+              </CardFooter>
+            )}
+          </Card>
+        </TabsContent>
+      </Tabs>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent>

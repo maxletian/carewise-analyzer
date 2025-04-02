@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from '@/components/ui/use-toast';
@@ -12,6 +11,11 @@ interface User {
 
 interface StoredUser extends User {
   passwordHash: string;
+  lastActive?: string;
+  activityLog?: {
+    timestamp: string;
+    action: string;
+  }[];
 }
 
 interface AuthContextType {
@@ -22,9 +26,15 @@ interface AuthContextType {
   logout: () => void;
   updateProfile: (userData: Partial<User>) => void;
   isAdmin: () => boolean;
+  logActivity: (action: string) => void;
+  getAllUsers: () => StoredUser[];
+  getMaxAdminCount: () => number;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+// Maximum number of admins allowed
+const MAX_ADMIN_COUNT = 2;
 
 // Simple hash function for demo purposes (NOT for production use)
 const hashPassword = (password: string): string => {
@@ -55,11 +65,71 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         id: parsedUser.id,
         email: parsedUser.email,
         name: parsedUser.name,
-        role: parsedUser.role || 'user' // Default to 'user' for existing users
+        role: parsedUser.role || 'user'
       });
+      
+      // Log user activity on initial load
+      if (parsedUser.id) {
+        logActivity('app_accessed');
+      }
     }
     setLoading(false);
   }, []);
+
+  const getAllUsers = () => {
+    const storedUsers = localStorage.getItem('carewise_users');
+    return storedUsers ? JSON.parse(storedUsers) : [];
+  };
+
+  const getMaxAdminCount = () => MAX_ADMIN_COUNT;
+
+  const logActivity = (action: string) => {
+    if (!user) return;
+
+    // Get stored users
+    const storedUsers = localStorage.getItem('carewise_users');
+    const users: StoredUser[] = storedUsers ? JSON.parse(storedUsers) : [];
+    
+    // Find current user and update activity
+    const updatedUsers = users.map(u => {
+      if (u.id === user.id) {
+        const newActivity = {
+          timestamp: new Date().toISOString(),
+          action
+        };
+        
+        return {
+          ...u,
+          lastActive: new Date().toISOString(),
+          activityLog: u.activityLog ? [...u.activityLog, newActivity] : [newActivity]
+        };
+      }
+      return u;
+    });
+    
+    // Update localStorage
+    localStorage.setItem('carewise_users', JSON.stringify(updatedUsers));
+    
+    // Also update current user if it's stored
+    const currentUser = localStorage.getItem('carewise_user');
+    if (currentUser) {
+      const parsedUser: StoredUser = JSON.parse(currentUser);
+      if (parsedUser.id === user.id) {
+        const newActivity = {
+          timestamp: new Date().toISOString(),
+          action
+        };
+        
+        const updatedUser = {
+          ...parsedUser,
+          lastActive: new Date().toISOString(),
+          activityLog: parsedUser.activityLog ? [...parsedUser.activityLog, newActivity] : [newActivity]
+        };
+        
+        localStorage.setItem('carewise_user', JSON.stringify(updatedUser));
+      }
+    }
+  };
 
   const login = async (email: string, password: string) => {
     try {
@@ -97,6 +167,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       });
       
       navigate('/dashboard');
+      
+      // Log the activity
+      logActivity('logged_in');
     } catch (error) {
       toast({
         title: "Login failed",
@@ -118,16 +191,28 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         throw new Error('An account with this email already exists');
       }
       
-      // Create admin account if it's the first user or use special admin email
-      const isAdmin = users.length === 0 || email === 'admin@carewise.com';
+      // Check if we already have MAX_ADMIN_COUNT admins for non-special emails
+      const isSpecialAdmin = email === 'admin@carewise.com';
+      const currentAdminCount = users.filter(u => u.role === 'admin').length;
       
-      // Create new user
+      // Create admin account if it's the first user, special admin email, or we have room for more admins
+      const isAdmin = users.length === 0 || isSpecialAdmin || currentAdminCount < MAX_ADMIN_COUNT;
+      
+      // If we're at max admins and this isn't a special case, make it a regular user
+      const role = (currentAdminCount >= MAX_ADMIN_COUNT && !isSpecialAdmin && users.length > 0) ? 'user' : (isAdmin ? 'admin' : 'user');
+      
+      // Create new user with activity tracking
       const newUser: StoredUser = {
         id: 'user-' + Math.random().toString(36).substring(2, 9),
         email,
         name,
         passwordHash: hashPassword(password),
-        role: isAdmin ? 'admin' : 'user'
+        role,
+        lastActive: new Date().toISOString(),
+        activityLog: [{
+          timestamp: new Date().toISOString(),
+          action: 'account_created'
+        }]
       };
       
       // Add to users array
@@ -148,12 +233,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       
       toast({
         title: "Account created",
-        description: isAdmin 
+        description: role === 'admin'
           ? "Welcome to CareWise! You have been granted admin privileges."
           : "Welcome to CareWise!"
       });
       
       navigate('/dashboard');
+      
+      // Log the activity
+      logActivity('account_created');
     } catch (error) {
       toast({
         title: "Signup failed",
@@ -165,6 +253,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const logout = () => {
+    // Log the activity before logging out
+    if (user) {
+      logActivity('logged_out');
+    }
+    
     localStorage.removeItem('carewise_user');
     localStorage.removeItem('health_data');
     setUser(null);
@@ -206,6 +299,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       };
       setUser(updatedPublicUser);
       
+      // Log the activity
+      logActivity('profile_updated');
+      
       toast({
         title: "Profile updated",
         description: "Your profile has been successfully updated"
@@ -218,7 +314,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, signup, logout, updateProfile, isAdmin }}>
+    <AuthContext.Provider value={{ 
+      user, 
+      loading, 
+      login, 
+      signup, 
+      logout, 
+      updateProfile, 
+      isAdmin,
+      logActivity, 
+      getAllUsers,
+      getMaxAdminCount
+    }}>
       {children}
     </AuthContext.Provider>
   );

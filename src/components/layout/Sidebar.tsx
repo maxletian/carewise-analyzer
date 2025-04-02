@@ -1,5 +1,4 @@
-
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { 
   Gauge, 
@@ -18,7 +17,12 @@ const Sidebar = () => {
   const [collapsed, setCollapsed] = useState(false);
   const isMobile = useIsMobile();
   const location = useLocation();
-  const { isAdmin } = useAuth();
+  const { isAdmin, logActivity } = useAuth();
+
+  useEffect(() => {
+    const pageName = location.pathname.substring(1) || 'home';
+    logActivity(`visited_${pageName}`);
+  }, [location.pathname, logActivity]);
 
   const links = [
     { name: 'Dashboard', to: '/dashboard', icon: <Gauge size={20} /> },
@@ -28,7 +32,6 @@ const Sidebar = () => {
     { name: 'Settings', to: '/settings', icon: <Settings size={20} /> },
   ];
 
-  // Add admin link for admin users only
   if (isAdmin()) {
     links.push({ name: 'Admin', to: '/admin', icon: <Shield size={20} /> });
   }

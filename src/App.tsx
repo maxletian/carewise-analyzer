@@ -21,6 +21,15 @@ import Settings from "./pages/Settings";
 import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
 
+// Add activity tracking to health context
+const wrapWithActivityTracking = (Component: React.ComponentType, action: string) => {
+  return (props: any) => {
+    return (
+      <Component {...props} activityAction={action} />
+    );
+  };
+};
+
 const queryClient = new QueryClient();
 
 const App = () => (
