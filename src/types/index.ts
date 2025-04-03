@@ -53,3 +53,24 @@ export interface StudentWithBalance extends Student {
   currentSemester: string;
   currentAcademicYear: string;
 }
+
+// Input types for form handling
+export interface StudentInput {
+  adminNumber: string;
+  firstName: string;
+  lastName: string;
+  class: string;
+  grade: string;
+  guardianName: string;
+  guardianContact: string;
+}
+
+export interface FeesStructureInput {
+  academicYear: string;
+  semester: string;
+  class: string;
+  amount: number;
+  description: string;
+  dueDate: Date;
+}
+
