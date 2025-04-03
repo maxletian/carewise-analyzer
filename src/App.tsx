@@ -8,6 +8,7 @@ import Layout from "@/components/layout/Layout";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { HealthProvider } from "@/contexts/HealthContext";
+import { SchoolFeesProvider } from "@/contexts/SchoolFeesContext";
 
 // Pages
 import Index from "./pages/Index";
@@ -21,6 +22,17 @@ import Settings from "./pages/Settings";
 import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
 import { useAuth } from "./contexts/AuthContext";
+
+// School Fees Pages
+import SchoolFeesIndex from "./pages/SchoolFees/SchoolFeesIndex";
+import SchoolFeesDashboard from "./pages/SchoolFees/Dashboard";
+import StudentRegistration from "./pages/SchoolFees/StudentRegistration";
+import StudentsList from "./pages/SchoolFees/StudentsList";
+import StudentDetails from "./pages/SchoolFees/StudentDetails";
+import FeesStructure from "./pages/SchoolFees/FeesStructure";
+import RecordPayment from "./pages/SchoolFees/RecordPayment";
+import Receipt from "./pages/SchoolFees/Receipt";
+import Reports from "./pages/SchoolFees/Reports";
 
 // Admin route guard component
 const AdminRoute = ({ children }: { children: React.ReactNode }) => {
@@ -66,6 +78,18 @@ const AppRoutes = () => {
           <Admin />
         </AdminRoute>
       } />
+      
+      {/* School Fees Management Routes */}
+      <Route path="/school-fees" element={<SchoolFeesDashboard />} />
+      <Route path="/school-fees/index" element={<SchoolFeesIndex />} />
+      <Route path="/school-fees/students" element={<StudentsList />} />
+      <Route path="/school-fees/students/register" element={<StudentRegistration />} />
+      <Route path="/school-fees/students/:studentId" element={<StudentDetails />} />
+      <Route path="/school-fees/fees" element={<FeesStructure />} />
+      <Route path="/school-fees/payments/new/:studentId" element={<RecordPayment />} />
+      <Route path="/school-fees/receipt/:paymentId" element={<Receipt />} />
+      <Route path="/school-fees/reports" element={<Reports />} />
+      
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
@@ -77,13 +101,15 @@ const App = () => (
       <ThemeProvider>
         <AuthProvider>
           <HealthProvider>
-            <TooltipProvider>
-              <Toaster />
-              <Sonner />
-              <Layout>
-                <AppRoutes />
-              </Layout>
-            </TooltipProvider>
+            <SchoolFeesProvider>
+              <TooltipProvider>
+                <Toaster />
+                <Sonner />
+                <Layout>
+                  <AppRoutes />
+                </Layout>
+              </TooltipProvider>
+            </SchoolFeesProvider>
           </HealthProvider>
         </AuthProvider>
       </ThemeProvider>
