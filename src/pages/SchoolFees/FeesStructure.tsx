@@ -1,10 +1,9 @@
-
 import React, { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useSchoolFees } from "@/contexts/SchoolFeesContext";
-import { FeesStructure } from "@/types";
+import { FeesStructure, FeesStructureInput } from "@/types";
 import {
   Card,
   CardContent,
@@ -78,10 +77,16 @@ export default function FeesStructurePage() {
   function onSubmit(values: z.infer<typeof formSchema>) {
     try {
       const dueDate = new Date(values.dueDate);
-      addFeesStructure({
-        ...values,
+      const feesStructureInput: FeesStructureInput = {
+        academicYear: values.academicYear,
+        semester: values.semester,
+        class: values.class,
+        amount: values.amount,
+        description: values.description,
         dueDate,
-      });
+      };
+      
+      addFeesStructure(feesStructureInput);
       form.reset({
         academicYear: currentAcademicYear,
         semester: currentSemester,
