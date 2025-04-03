@@ -5,7 +5,9 @@ import {
   Payment, 
   FeesStructure, 
   Receipt,
-  StudentWithBalance
+  StudentWithBalance,
+  StudentInput,
+  FeesStructureInput
 } from '@/types';
 import { v4 as uuidv4 } from 'uuid';
 import { useToast } from "@/hooks/use-toast";
@@ -19,7 +21,7 @@ interface SchoolFeesContextType {
   currentSemester: string;
   
   // Student Management
-  addStudent: (student: Omit<Student, "id" | "registrationDate">) => Student;
+  addStudent: (student: StudentInput) => Student;
   updateStudent: (id: string, studentData: Partial<Student>) => void;
   deleteStudent: (id: string) => void;
   getStudent: (id: string) => Student | undefined;
@@ -30,7 +32,7 @@ interface SchoolFeesContextType {
   getPaymentsForStudent: (studentId: string) => Payment[];
   
   // Fees Structure Management
-  addFeesStructure: (feesStructure: Omit<FeesStructure, "id">) => FeesStructure;
+  addFeesStructure: (feesStructure: FeesStructureInput) => FeesStructure;
   updateFeesStructure: (id: string, feesData: Partial<FeesStructure>) => void;
   deleteFeesStructure: (id: string) => void;
   getCurrentFeesForClass: (className: string) => FeesStructure | undefined;
@@ -148,7 +150,7 @@ export const SchoolFeesProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   }, [currentSemester]);
   
   // Student Management Functions
-  const addStudent = (studentData: Omit<Student, "id" | "registrationDate">) => {
+  const addStudent = (studentData: StudentInput) => {
     const existingStudent = students.find(
       (s) => s.adminNumber === studentData.adminNumber
     );
@@ -255,7 +257,7 @@ export const SchoolFeesProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   };
   
   // Fees Structure Management Functions
-  const addFeesStructure = (feesData: Omit<FeesStructure, "id">) => {
+  const addFeesStructure = (feesData: FeesStructureInput) => {
     // Check if there's already a fee structure for this combination
     const existingStructure = feesStructures.find(
       (fs) =>

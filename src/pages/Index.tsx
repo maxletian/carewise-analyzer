@@ -51,11 +51,10 @@ export default function Index() {
     <div className="container mx-auto py-10">
       <div className="max-w-3xl mx-auto text-center mb-10">
         <h1 className="text-4xl font-bold tracking-tight sm:text-5xl mb-4">
-          Welcome to CareWise
+          Platform Dashboard
         </h1>
         <p className="text-xl text-muted-foreground">
-          Your comprehensive platform for health tracking, analytics, and 
-          school administration tools.
+          Access both Health Assessment and School Fees Management modules
         </p>
       </div>
 

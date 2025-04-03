@@ -5,6 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useNavigate } from "react-router-dom";
 import { useSchoolFees } from "@/contexts/SchoolFeesContext";
+import { StudentInput } from "@/types";
 
 import {
   Card,
@@ -56,7 +57,7 @@ export default function StudentRegistration() {
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  const form = useForm<z.infer<typeof formSchema>>({
+  const form = useForm<StudentInput>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       firstName: "",
@@ -69,7 +70,7 @@ export default function StudentRegistration() {
     },
   });
 
-  function onSubmit(values: z.infer<typeof formSchema>) {
+  function onSubmit(values: StudentInput) {
     try {
       const student = addStudent(values);
       toast({
